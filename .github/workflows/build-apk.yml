@@ -1,0 +1,90 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type (debug or release)'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build-apk:
+    name: Build & Package Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java JDK (Temurin 21)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: 🤖 Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: 📦 Install Node Dependencies
+        run: |
+          npm install
+
+      - name: 🏗️ Build Web Application
+        run: |
+          npm run build
+
+      - name: 🔄 Sync Capacitor Android Platform
+        run: |
+          npx cap sync android
+
+      - name: ⚙️ Grant Execute Permission to Gradle Wrapper
+        run: |
+          chmod +x android/gradlew
+
+      - name: 🔨 Build Android APK
+        run: |
+          cd android
+          if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
+            ./gradlew assembleRelease --no-daemon --stacktrace
+          else
+            ./gradlew assembleDebug --no-daemon --stacktrace
+          fi
+
+      - name: 📂 Prepare APK Artifact
+        run: |
+          mkdir -p release-artifacts
+          if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk release-artifacts/tuktukir-sangsar-debug.apk
+          fi
+          if [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release-unsigned.apk release-artifacts/tuktukir-sangsar-release.apk
+          fi
+          echo "Generated APKs:"
+          ls -lh release-artifacts/
+
+      - name: 🚀 Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tuktukir-Sangsar-APK
+          path: release-artifacts/*.apk
+          retention-days: 30
