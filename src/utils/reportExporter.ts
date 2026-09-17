@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+import { Printer } from '@capgo/capacitor-printer';
 import { FamilyMember, Transaction } from '../types';
 import { formatCurrency, formatDate, formatMonthYear, getTodayDate } from './formatters';
 
@@ -37,6 +39,58 @@ interface AnnualReportData {
   lang: 'bn' | 'en';
 }
 
+export async function printAppWebView(
+  name = 'টুকটুকির সংসার রিপোর্ট'
+): Promise<void> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await Printer.printWebView({ name });
+      return;
+    }
+
+    window.print();
+  } catch (error) {
+    console.error('Print failed:', error);
+    alert('প্রিন্ট চালু করা যায়নি।');
+  }
+}
+
+export async function printReportHtml(
+  html: string,
+  name = 'টুকটুকির সংসার রিপোর্ট'
+): Promise<void> {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      await Printer.printHtml({
+        name,
+        html,
+      });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  } catch (error) {
+    console.error('Report print failed:', error);
+    alert('রিপোর্ট প্রিন্ট করা যায়নি।');
+  }
+}
+
 // Utility to safely escape CSV values
 function escapeCSV(val: string | number | undefined | null): string {
   if (val === undefined || val === null) return '""';
@@ -69,7 +123,7 @@ export function exportMonthlyReportCSV(data: MonthlyReportData): void {
 
   // 1. Header Information
   lines.push(`${escapeCSV(appName)},${escapeCSV('')},${escapeCSV('')},${escapeCSV('')},${escapeCSV('')}`);
-  lines.push(`${escapeCSV(isBn ? 'মাসিক আর্থিক বিবরণী (Monthly Financial Statement)' : 'Monthly Financial Statement')},${escapeCSV(formatMonthYear(data.year, data.month, data.lang))}`);
+  lines.push(`${escapeCSV(isBn ? 'মাসিক আর্থিক বিবরণী (Monthly Financial Statement)' : 'Monthly Financial Statement')},${escapeCSV(formatMonthYear(data.year, data["month"], data.lang))}`);
   lines.push(`${escapeCSV(isBn ? 'রিপোর্ট তৈরির তারিখ' : 'Report Generated Date')},${escapeCSV(formatDate(getTodayDate(), data.lang))}`);
   lines.push(`${escapeCSV(isBn ? 'মুদ্রা' : 'Currency')},${escapeCSV(data.currencySymbol)}`);
   lines.push('');
@@ -85,7 +139,7 @@ export function exportMonthlyReportCSV(data: MonthlyReportData): void {
 
   // 3. Category Breakdown
   lines.push(escapeCSV(isBn ? '--- ২. খাতভিত্তিক ব্যয় বিবরণী (Category-wise Expenses) ---' : '--- 2. Category-wise Expenses ---'));
-  lines.push(`${escapeCSV(isBn ? 'ব্যয়ের খাত (Category)' : 'Category')},${escapeCSV(isBn ? 'মোট পরিমাণ (Amount)' : 'Amount')},${escapeCSV(isBn ? 'শতকরা হার (Percentage)' : 'Percentage')}`);
+  lines.push(`${escapeCSV(isBn ? 'ব্যয়ের খাত (Category)' : 'Category')},${escapeCSV(isBn ? 'মোট পরিমাণ (Amount)' : 'Amount')},${escapeCSV(isBn ? 'শতকরা (%)' : '% of Total')}`);
   if (data.categoryExpenseList.length > 0) {
     data.categoryExpenseList.forEach((cat) => {
       lines.push(`${escapeCSV(cat.category)},${escapeCSV(cat.amount)},${escapeCSV(`${cat.percent.toFixed(1)}%`)}`);
@@ -167,7 +221,7 @@ export function exportAnnualReportCSV(data: AnnualReportData): void {
 
   // 12-Month Breakdown
   lines.push(escapeCSV(isBn ? '--- ২. মাসভিত্তিক তুলনামূলক হিসাব (Month-by-Month Statement) ---' : '--- 2. Month-by-Month Statement ---'));
-  lines.push(`${escapeCSV(isBn ? 'মাস (Month)' : 'Month')},${escapeCSV(isBn ? 'আয় (Income)' : 'Income')},${escapeCSV(isBn ? 'ব্যয় (Expense)' : 'Expense')},${escapeCSV(isBn ? 'ব্যালেন্স (Balance)' : 'Balance')},${escapeCSV(isBn ? 'সঞ্চয়ের হার % (Savings Rate %)' : 'Savings Rate %')}`);
+  lines.push(`${escapeCSV(isBn ? 'মাস (Month)' : 'Month')},${escapeCSV(isBn ? 'আয় (Income)' : 'Income')},${escapeCSV(isBn ? 'ব্যয় (Expense)' : 'Expense')},${escapeCSV(isBn ? 'ব্যালেন্স (Balance)' : 'Balance')},${escapeCSV(isBn ? 'সঞ্চয়ের হার (%)' : 'Savings %')}`);
 
   data.annualMonths.forEach((m) => {
     lines.push(`${escapeCSV(m.name)},${escapeCSV(m.income)},${escapeCSV(m.expense)},${escapeCSV(m.balance)},${escapeCSV(`${m.savingsRate.toFixed(1)}%`)}`);
