@@ -29,58 +29,63 @@ jobs:
 
     steps:
 
-      # 1. Checkout Repository
-      - name: 📥 Checkout Repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Setup Java
-      - name: ☕ Setup Java JDK (Temurin 21)
+      - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
           java-version: "21"
           cache: "gradle"
 
-      # 3. Setup Android SDK
-      - name: 🤖 Setup Android SDK
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ""
 
-      # 4. Install Android SDK Packages
-      - name: 📦 Install Android SDK Packages
+      - name: Install Android SDK Packages
+        shell: bash
         run: |
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-          yes | sdkmanager --licenses
+          set -e
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
-      # 5. Setup Node.js
-      - name: 🟢 Setup Node.js
+      - name: Accept Android SDK Licenses
+        shell: bash
+        run: |
+          set +o pipefail
+          yes | sdkmanager --licenses
+          set -o pipefail
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
           cache: "npm"
 
-      # 6. Install Node Dependencies
-      - name: 📦 Install Node Dependencies
+      - name: Install Node Dependencies
         run: |
           npm install
 
-      # 7. Build Web Application
-      - name: 🔨 Build Web Application
+      - name: Build Web Application
         run: |
           npm run build
 
-      # 8. Sync Capacitor Android
-      - name: 📱 Sync Capacitor Android Platform
+      - name: Sync Capacitor Android Platform
         run: |
           npx cap sync android
 
-      # 9. Give Gradle Permission
-      - name: ⚙️ Grant Execute Permission to Gradle Wrapper
+      - name: Grant Execute Permission to Gradle Wrapper
         run: |
           chmod +x android/gradlew
 
-      # 10. Build Android APK
-      - name: 🔨 Build Android APK
+      - name: Build Android APK
+        shell: bash
         run: |
+          set -e
           cd android
 
           if [ "${{ github.event.inputs.build_type }}" = "release" ]; then
@@ -89,26 +94,27 @@ jobs:
             ./gradlew assembleDebug --no-daemon --stacktrace
           fi
 
-      # 11. Prepare APK Artifact
-      - name: 📁 Prepare APK Artifact
+      - name: Prepare APK Artifact
+        shell: bash
         run: |
+          set -e
+
           mkdir -p release-artifacts
 
           if [ -f android/app/build/outputs/apk/debug/app-debug.apk ]; then
             cp android/app/build/outputs/apk/debug/app-debug.apk \
-            release-artifacts/tuktukir-sangsar-debug.apk
+              release-artifacts/tuktukir-sangsar-debug.apk
           fi
 
           if [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
             cp android/app/build/outputs/apk/release/app-release-unsigned.apk \
-            release-artifacts/tuktukir-sangsar-release-unsigned.apk
+              release-artifacts/tuktukir-sangsar-release-unsigned.apk
           fi
 
           echo "Generated APK files:"
           ls -lh release-artifacts/
 
-      # 12. Upload APK
-      - name: 📤 Upload APK Artifact
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Tuktukir-Sangsar-APK
